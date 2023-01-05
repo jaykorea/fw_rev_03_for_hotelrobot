@@ -87,7 +87,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "md_node");                                                   //Node name initialization.
     ros::NodeHandle nh;                                                                 //Node handle declaration for communication with ROS system.
     ros::Subscriber vel_sub = nh.subscribe("vel_topic", 100, velCallBack);
-    ros::Subscriber input_scan_sub = nh.subscribe("/scan_rp", 100, update_scan);               //Subscriber declaration.
+    ros::Subscriber input_scan_sub = nh.subscribe("/scan_rp_filtered", 100, update_scan);               //Subscriber declaration.
     ros::Publisher resume_pub = nh.advertise<std_msgs::Empty>("/freeway/resume", 10);
     ros::Publisher move_base_cancel_pub = nh.advertise<actionlib_msgs::GoalID>("move_base_flex/move_base/cancel", 10);
     //ros::Publisher freeway_goal_cancel_pub = nh.advertise<std_msgs::Empty>("freeway/goal_cancel", 10);

@@ -36,6 +36,9 @@ typedef unsigned char  BYTE;
 #define DEG2RAD(x) (x * 0.01745329252) // *PI/180
 #define RAD2DEG(x) (x * 57.2957795131) // *180/PI
 
+bool debug_print=false;
+//int not_moving_count=0;
+double mct;
 const double Pi = 3.14159265359;
 
 typedef struct {
@@ -75,6 +78,7 @@ MotorDriver Md;
 typedef struct {
   double posx, posy, posth;
   double velx, angz;
+  double pre_posx, pre_posy, pre_ori;
 } freewayOdom;
 freewayOdom fo;
 
@@ -156,7 +160,7 @@ void monitorCallBack(const md::monitor_msg::ConstPtr& monitor)
     //ROS_INFO("%4d %4d", nGap, Md.sTheta);
     //nExsTheta = Md.sTheta;
     //ROS_INFO("%d, %d, %d, %d", Md.sCmdLinearVel, Md.sRealLinearVel, Md.sCmdAngularVel, Md.sRealAngularVel);
-    printf("sub-> x: %lf  y: %lf  theta(DEG): %lf theta(RAD): %lf  linearVel: %f  angularVel: %f  L_Cur: %d  R_Cur: %d  US1:%d  US2:%d  US3:%d  "
+    if(debug_print) printf("sub-> x: %lf  y: %lf  theta(DEG): %lf theta(RAD): %lf  linearVel: %f  angularVel: %f  L_Cur: %d  R_Cur: %d  US1:%d  US2:%d  US3:%d  "
            "volt:%d  Emergecy:%d  Charge:%d  DocState:%d  LMotStatu:%d  RMotStatu:%d  LDirPin:%d  LSSPin:%d  "
            "RDirPin:%d  RSSPin:%d \n",
           fo.posx, fo.posy, Md.fTheta, fo.posth,fo.velx, fo.angz, Md.sCurrent[LEFT], Md.sCurrent[RIGHT], Md.byUS1, Md.byUS2, Md.byUS3, Md.sVoltIn,
@@ -173,6 +177,26 @@ void keyboardCallBack(const geometry_msgs::Twist& keyVel)
         Md.sCmdAngularVel = keyVel.angular.z * 180/Pi;// 1 deg/s -> Rad to Deg
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
+bool moving_check(double posx, double posy, double ori, double moving_check_time) {
+    if(posx == fo.pre_posx && posy == fo.pre_posy && ori == fo.pre_ori) {
+        // not_moving_count++;
+        // if (not_moving_count >= 100) {
+        //     not_moving_count = 100;
+        //     return true;
+        // }
+        // mct = moving_check_time;
+        //ros::Time::now().toSec();
+        mct = mct;
+    }
+    else mct= moving_check_time;
+
+    if (moving_check_time-mct > 2.0) return true;
+    else return false;
+    // else {
+    //     not_moving_count = 0;
+    //     return false; 
+    // }
+}
 
 //Node main function
 int main(int argc, char** argv)
@@ -187,6 +211,7 @@ int main(int argc, char** argv)
     ros::Subscriber keyboard_sub = nh.subscribe("cmd_vel", 10, keyboardCallBack);
     
     ros::Time current_time;
+    mct=ros::Time::now().toSec();
     ros::Rate r(20);                                                                      //Set the loop period -> 50ms.
 
     nOperMode = 0;
@@ -220,6 +245,7 @@ int main(int argc, char** argv)
         ros::spinOnce();
 
         current_time = ros::Time::now();
+        double moving_check_time = ros::Time::now().toSec();
 
         geometry_msgs::Quaternion quaternion = tf::createQuaternionMsgFromYaw((fo.posth)); //fo.posth
         // transform.setOrigin(tf::Vector3(fo.posx,fo.posy,0));
@@ -240,11 +266,20 @@ int main(int argc, char** argv)
 
         odom.pose.covariance[0] = 0.3;
 	    odom.pose.covariance[7] = 0.3;
-	    odom.pose.covariance[14] = 100000;
-	    odom.pose.covariance[21] = 100000;
-	    odom.pose.covariance[28] = 100000;
 	    odom.pose.covariance[35] = 1.0;
-	    
+
+        if(moving_check(fo.posx, fo.posy, quaternion.z, moving_check_time)) {
+	        odom.pose.covariance[14] = 0.001;
+	        odom.pose.covariance[21] = 0.001;
+	        odom.pose.covariance[28] = 0.001;
+        }
+
+        else {
+            odom.pose.covariance[14] = 9999;
+	        odom.pose.covariance[21] = 9999;
+	        odom.pose.covariance[28] = 9999;
+        }
+
         odom.twist.covariance = odom.pose.covariance;
 
         // odom_tf.header = odom.header;
@@ -257,6 +292,9 @@ int main(int argc, char** argv)
         
                         
         odom_pub.publish(odom);
+        fo.pre_posx = fo.posx;
+        fo.pre_posy = fo.posy;
+        fo.pre_ori = quaternion.z;
         // ros::spinOnce();
         r.sleep();                                //Go to sleep according to the loop period defined
     }

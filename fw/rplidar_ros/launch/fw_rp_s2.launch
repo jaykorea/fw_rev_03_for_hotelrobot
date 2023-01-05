@@ -6,4 +6,6 @@
   <param name="inverted"            type="bool"   value="false"/>
   <param name="angle_compensate"    type="bool"   value="true"/>
   </node>
+
+  <node name="rplidarNode_filter"  pkg="rplidar_ros"  type="rplidarNode_filter" output="screen"></node>
 </launch>
